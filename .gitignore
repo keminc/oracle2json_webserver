@@ -1,0 +1,11 @@
+*.pyc
+*.iml
+*.xml
+*.log
+*.dll
+__pycache__/*
+/cache/*.json
+/cache/all-transfers.json
+/cache/pay-systems-status.json
+/cache/all-transfers.json
+/cache/all-transfers.json

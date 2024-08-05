@@ -1,0 +1,1 @@
+SELECT 'db test is ok' AS "result" FROM dual

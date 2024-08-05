@@ -1,0 +1,6 @@
+{
+  "test": {"sql": "SELECT 'db test is ok' AS result FROM dual",
+                        "cache_timeout_s": 5},
+  "test2": {"sql": "dbtest.sql"}
+ 
+}

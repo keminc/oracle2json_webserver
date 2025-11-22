@@ -13,10 +13,58 @@ from modules.tech_func import *
 from config.config import *
 
 
+# Oracle client initialization state: prevents repeated init calls in multithreaded usage.
+_ORACLE_CLIENT_INITIALIZED = False
+
+
+def init_oracle_client_if_needed():
+    """Initialize Oracle thick client when enabled by configuration.
+
+    Purpose:
+        Switches python-oracledb to thick mode to handle password verifier formats
+        unsupported in thin mode (e.g., DPY-3015).
+    Inputs:
+        None; uses module-level configuration flags and environment variables.
+    Outputs:
+        None directly; raises exceptions if client initialization fails.
+    """
+    global _ORACLE_CLIENT_INITIALIZED
+
+    # Return early when thick mode is disabled or initialization already executed.
+    if _ORACLE_CLIENT_INITIALIZED or not use_thick_mode:
+        return
+
+    try:
+        # Initialize Instant Client with optional explicit lib_dir path when provided.
+        client_dir = oracle_client_lib_dir if len(oracle_client_lib_dir) > 0 else None
+        oracledb.init_oracle_client(lib_dir=client_dir)
+        _ORACLE_CLIENT_INITIALIZED = True
+        add_to_log('INFO.\tOracle thick client initialized successfully.')
+    except Exception as e:
+        # Log detailed exception for operational visibility and re-raise to stop startup.
+        add_to_log(print_exception(e))
+        raise
+
+
 ##################################################################################
 def exec_sql_cmd(sql):
+    """Execute SQL against Oracle and return structured rows.
+
+    Purpose:
+        Runs a single SQL statement using configured credentials and returns results
+        as a list of dictionaries (column name -> value). Handles initialization of
+        the Oracle client to avoid thin-mode verifier issues.
+    Inputs:
+        sql (str): SQL query string prepared by upstream configuration.
+    Outputs:
+        tuple(bool, list|dict): success flag and result payload or error details.
+    """
     result_rows, f_result = [], False
     try:
+        # Ensure Oracle client is initialized before opening a connection.
+        init_oracle_client_if_needed()
+
+        # Open connection with timeout safeguards to prevent hanging threads.
         with oracledb.connect(user=user, password=pwd64, dsn=dsn, tcp_connect_timeout=5) as con:
             #print("Python lib version:", oracledb.__version__,"Database version:", con.version )
             cur = con.cursor()
@@ -36,6 +84,11 @@ def exec_sql_cmd(sql):
                 result_rows.append(res)
         f_result = True
     except Exception as e:
+        # Capture DPY-3015 specifically to guide operators toward thick mode usage.
+        if 'DPY-3015' in str(e) and not use_thick_mode:
+            guidance = ('ERROR.\tDPY-3015 encountered in thin mode. Set ORACLE_USE_THICK_MODE=true ' 
+                        'and provide Instant Client via ORACLE_CLIENT_LIB_DIR to enable supported verifiers.')
+            add_to_log(guidance)
         add_to_log(print_exception(e))
         result_rows = {'ERROR': str(e)}
     finally:

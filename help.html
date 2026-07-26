@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ora2json API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
+h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+h2 { color: #2980b9; margin-top: 30px; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: #f8f8f8; border: 1px solid #ddd; border-radius: 5px; padding: 15px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background: #3498db; color: white; }
+tr:nth-child(even) { background: #f9f9f9; }
+a { color: #3498db; }
+.endpoint-list { column-count: 2; }
+.endpoint-list li { margin: 3px 0; }
+</style></head><body>
+<h1>ora2json web service</h1>
+<p>HTTP-сервис для выполнения SQL-запросов к Oracle DB с возвратом результата в JSON.</p>
+
+<h2>Настройка подключений к БД</h2>
+<p>Подключения настраиваются в файле <code>config/sql.lib.yml</code>:</p>
+<pre>
+db_connections:
+  - name: "DB_ALIAS_1"
+    user: "db_user"
+    dsn: "db-host.example.com/DB_SERVICE_1"
+  - name: "DB_ALIAS_2"
+    user: "db_user"
+    dsn: "db-host.example.com/DB_SERVICE_2"
+</pre>
+
+<h2>Переменные окружения</h2>
+<p>Пароль для каждого подключения передаётся через переменную окружения <code>&lt;name&gt;_token</code> в формате base64:</p>
+<pre>
+# Формат: имя подключения + _token
+export DB_ALIAS_1_token="$(echo -n 'пароль' | base64)"
+export DB_ALIAS_2_token="$(echo -n 'пароль' | base64)"
+</pre>
+<p>Если переменная не задана или невалидна — все эндпоинты этого подключения вернут <code>HTTP 503</code>.</p>
+<p>Проверить статус подключений: <a href="/health">/health</a></p>
+
+<h2>Доступные эндпоинты</h2>
+<ul class="endpoint-list">{{ENDPOINTS}}</ul>
+
+<h2>Служебные</h2>
+<table>
+<tr><th>Путь</th><th>Описание</th></tr>
+<tr><td><a href="/health">/health</a></td><td>Проверка жизни сервиса</td></tr>
+<tr><td><a href="/status">/status</a></td><td>Статус сервиса и БД</td></tr>
+</table>
+
+<h2>Фильтрация (query parameters)</h2>
+<table>
+<tr><th>Параметр</th><th>Описание</th><th>Пример</th></tr>
+<tr><td><code>filter</code></td><td>Фильтр по полю. Формат: <code>поле:оператор:значение</code><br>Используйте <code>*</code> вместо имени поля для поиска по всем полям</td><td><code>?filter=country:eq:IND</code><br><code>?filter=*:contains:error</code></td></tr>
+<tr><td><code>fields</code></td><td>Вернуть только указанные поля (через запятую)</td><td><code>?fields=name,status</code></td></tr>
+<tr><td><code>sort</code></td><td>Сортировка: <code>поле</code> или <code>-поле</code> (desc)</td><td><code>?sort=-amount</code></td></tr>
+<tr><td><code>limit</code></td><td>Ограничить кол-во записей</td><td><code>?limit=10</code></td></tr>
+<tr><td><code>from</code> / <code>to</code></td><td>Фильтр по времени (epoch ms или ISO)</td><td><code>?from=1700000000000&amp;to=1700100000000</code></td></tr>
+<tr><td><code>time_field</code></td><td>Указать поле даты (авто-определяется если не задано)</td><td><code>?time_field=created_at</code></td></tr>
+</table>
+
+<h2>Операторы фильтра</h2>
+<table>
+<tr><th>Оператор</th><th>Описание</th></tr>
+<tr><td><code>eq</code></td><td>Равно (без учёта регистра)</td></tr>
+<tr><td><code>neq</code></td><td>Не равно</td></tr>
+<tr><td><code>contains</code></td><td>Содержит подстроку</td></tr>
+<tr><td><code>gt</code> / <code>lt</code></td><td>Больше / меньше</td></tr>
+<tr><td><code>gte</code> / <code>lte</code></td><td>Больше-равно / меньше-равно</td></tr>
+</table>
+
+<h2>Примеры запросов</h2>
+<pre>
+GET /get-balances
+GET /get-balances?fields=WALLET,BALANCE&amp;sort=-BALANCE&amp;limit=5
+GET /all-transfers?filter=status:eq:success&amp;limit=100
+GET /all-transfers?from=1700000000000&amp;to=1700100000000
+GET /countries_enabled?filter=country:contains:Rus&amp;fields=country,cur_iso
+GET /errors_encyclopedia?filter=*:contains:timeout
+</pre>
+
+<h2>Формат ответа</h2>
+<p>Массив JSON-объектов (каждый объект — строка результата SQL):</p>
+<pre>[
+  {"COLUMN1": "value1", "COLUMN2": 123},
+  {"COLUMN1": "value2", "COLUMN2": 456}
+]</pre>
+<p>В случае ошибки:</p>
+<pre>{"ERROR": "описание ошибки"}</pre>
+
+</body></html>

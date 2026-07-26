@@ -12,7 +12,7 @@ For speed and to reduce the load on the database, caching of SQL query results i
 
 ## Control:
   The service is configured via the file: config.py
-  The password for TUZ is set by placing the base64 hash in the environment variable: pfdwh_token
+  The database password is provided through an environment variable named after the configured connection, for example: DB_ALIAS_token
   SQL queries are configured via the file: sql.lib.json and by adding *.sql files to the sql directory.
   To work with password verifiers unsupported by the thin python-oracledb client (e.g., DPY-3015), set the environment variable ORACLE_USE_THICK_MODE=true and point ORACLE_CLIENT_LIB_DIR to your Oracle Instant Client directory so the service initializes in thick mode.
   Start/stop: run.sh stop|start|restart|status
@@ -36,7 +36,7 @@ For speed and to reduce the load on the database, caching of SQL query results i
 
 
 #### Base location:
-  - root@host:/opt/scripts/ora2json_webserver
+  - user@example-host:/opt/oracle2json_webserver
 
 #### PS:
    - but you can also run the script in the console mode.

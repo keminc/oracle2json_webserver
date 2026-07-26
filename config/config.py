@@ -1,21 +1,71 @@
 # -*- coding: utf-8 -*-
-import base64, os
+import base64, os, sys, logging, logging.handlers, yaml
 
-# HTTPS configuration block: toggles TLS for the HTTP server and port binding.
-use_ssl = False
-http_server_port = 443
+# Load config from YAML
+_config_path = os.path.join(os.path.dirname(__file__), 'sql.lib.yml')
+with open(_config_path, 'r') as _f:
+    _config = yaml.safe_load(_f)
 
-# Caching configuration block: defines default TTL for cached SQL responses.
-default_cache_timeout_s = 15
+_server = _config.get('server', {})
 
-# Oracle connection configuration block: DSN, credentials and client mode toggles.
-dsn = 'oracle-db.host.com/db-name'
-user = 'db-user'
-pwd64 = base64.b64decode(os.getenv('db-pwd', '')).decode('utf-8')   # in file ~/.bashrc
+use_ssl = _server.get('use_ssl', True)
+http_server_port = _server.get('http_server_port', 443)
+default_cache_timeout_s = _server.get('default_cache_timeout_s', 15)
 
-# Oracle thick client configuration block: optional Instant Client usage to avoid
-# DPY-3015 errors when the database password verifier is unsupported in thin mode.
-use_thick_mode = os.getenv('ORACLE_USE_THICK_MODE', 'false').lower() == 'true'
-oracle_client_lib_dir = os.getenv('ORACLE_CLIENT_LIB_DIR', '')
+# Parse db_connections list
+# Password for each connection is looked up from env var: <name>_token (base64-encoded)
+db_connections = {}
+db_credentials_error = ''
 
+for _conn in _config.get('db_connections', []):
+    _name = _conn.get('name', '')
+    if not _name:
+        continue
+    _env_var = f'{_name}_token'
+    _raw_token = os.getenv(_env_var, '')
+    _entry = {
+        'user': _conn.get('user', ''),
+        'dsn': _conn.get('dsn', ''),
+        'pwd': '',
+        'error': '',
+    }
+    if not _raw_token:
+        _entry['error'] = f'Database credentials not set: env variable {_env_var} is empty'
+    else:
+        try:
+            _entry['pwd'] = base64.b64decode(_raw_token).decode('utf-8')
+            if not _entry['pwd']:
+                _entry['error'] = f'Database credentials invalid: {_env_var} decoded password is empty'
+        except Exception as e:
+            _entry['error'] = f'Database credentials invalid ({_env_var}): {e}'
+    db_connections[_name] = _entry
 
+# Backward compatibility: expose first connection as flat vars
+_first_conn = next(iter(db_connections.values()), None)
+if _first_conn:
+    user = _first_conn['user']
+    dsn = _first_conn['dsn']
+    pwd64 = _first_conn['pwd']
+    db_credentials_error = _first_conn['error']
+else:
+    user = ''
+    dsn = ''
+    pwd64 = ''
+    db_credentials_error = 'No db_connections configured'
+
+# Log critical credential errors
+_errors = [c['error'] for c in db_connections.values() if c['error']]
+if _errors:
+    for _err in _errors:
+        print(f'CRITICAL: {_err}', file=sys.stderr)
+    _logger = logging.getLogger('ora2json_webserv')
+    _logger.setLevel(logging.CRITICAL)
+    try:
+        if sys.platform.startswith('linux'):
+            _logger.addHandler(logging.handlers.SysLogHandler(address='/dev/log'))
+        else:
+            _logger.addHandler(logging.handlers.NTEventLogHandler('ora2json_webserv'))
+    except Exception:
+        pass
+    for _err in _errors:
+        _logger.critical(_err)

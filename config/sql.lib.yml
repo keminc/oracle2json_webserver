@@ -1,0 +1,25 @@
+server:
+  use_ssl: true
+  http_server_port: 443
+  default_cache_timeout_s: 15
+
+# Password for each connection is looked up from OS environment variable by name field
+# e.g. name: "DWH" -> env var "DWH_token" (base64-encoded)
+db_connections:
+  - name: "DWH"
+    user: "dbuser"
+    dsn: "oracle.my.com/DWH"
+  - name: "DWH2"
+    user: "db_user"
+    dsn: "oracle.my.com/DWH2"
+
+status1:
+  sql: "SELECT 'db test is ok' as result FROM dual"
+  connection: "DWH"
+  cache_timeout_s: 5
+
+test2:
+  sql: "dbtest.sql"
+  connection: "DWH2"
+
+

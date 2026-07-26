@@ -9,3 +9,4 @@ __pycache__/*
 /cache/pay-systems-status.json
 /cache/all-transfers.json
 /cache/all-transfers.json
+/.serena/

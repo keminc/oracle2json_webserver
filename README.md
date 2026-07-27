@@ -23,8 +23,7 @@ For speed and to reduce the load on the database, caching of SQL query results i
   - server_JSON.py - MAIN web server module.
 
 #### CONFIG:
-  - config/config.py - configuration for work.
-  - config/sql.lib.json - configuration of executed SQL. Stores both the SQL themselves and links to them in the sql directory.
+  - config/sql.lib.yml - configuration of executed SQL. Stores both the SQL themselves and links to them in the sql directory.
   
 #### OTHER:  
   - cache - directory for storing the query cache
